@@ -1,12 +1,14 @@
+'use client';
+
+import * as React from 'react';
 import { createTheme } from '@ant-design/cssinjs';
 import IconContext from '@ant-design/icons/lib/components/Context';
 import type { ValidateMessages } from 'rc-field-form/lib/interface';
 import useMemo from 'rc-util/lib/hooks/useMemo';
 import { merge } from 'rc-util/lib/utils/set';
-import type { ReactElement } from 'react';
-import * as React from 'react';
 import type { Options } from 'scroll-into-view-if-needed';
-import warning from '../_util/warning';
+
+import warning, { WarningContext, type WarningContextProps } from '../_util/warning';
 import type { RequiredMark } from '../form/Form';
 import ValidateMessagesContext from '../form/validateMessagesContext';
 import type { InputProps } from '../input';
@@ -16,7 +18,8 @@ import type { LocaleContextProps } from '../locale/context';
 import LocaleContext from '../locale/context';
 import defaultLocale from '../locale/en_US';
 import type { SpaceProps } from '../space';
-import { DesignTokenContext } from '../theme/internal';
+import type { TabsProps } from '../tabs';
+import { defaultTheme, DesignTokenContext } from '../theme/context';
 import defaultSeedToken from '../theme/themes/seed';
 import type {
   BadgeConfig,
@@ -25,6 +28,9 @@ import type {
   ConfigConsumerProps,
   CSPConfig,
   DirectionType,
+  DrawerConfig,
+  FlexConfig,
+  ModalConfig,
   PopupOverflow,
   Theme,
   ThemeConfig,
@@ -37,11 +43,10 @@ import { DisabledContextProvider } from './DisabledContext';
 import useConfig from './hooks/useConfig';
 import useTheme from './hooks/useTheme';
 import MotionWrapper from './MotionWrapper';
+import PropWarning from './PropWarning';
 import type { SizeType } from './SizeContext';
 import SizeContext, { SizeContextProvider } from './SizeContext';
 import useStyle from './style';
-import { defaultTheme } from '../theme/context';
-import type { TabsProps } from '../tabs';
 
 /**
  * Since too many feedback using static method like `Modal.confirm` not getting theme, we record the
@@ -85,7 +90,10 @@ export const configConsumerProps = [
 ];
 
 // These props is used by `useContext` directly in sub component
-const PASSED_PROPS: Exclude<keyof ConfigConsumerProps, 'rootPrefixCls' | 'getPrefixCls'>[] = [
+const PASSED_PROPS: Exclude<
+  keyof ConfigConsumerProps,
+  'rootPrefixCls' | 'getPrefixCls' | 'warning'
+>[] = [
   'getTargetContainer',
   'getPopupContainer',
   'renderEmpty',
@@ -141,6 +149,9 @@ export interface ConfigProviderProps {
   popupMatchSelectWidth?: boolean;
   popupOverflow?: PopupOverflow;
   theme?: ThemeConfig;
+
+  warning?: WarningContextProps;
+
   alert?: ComponentStyleConfig;
   anchor?: ComponentStyleConfig;
   button?: ButtonConfig;
@@ -149,7 +160,7 @@ export interface ConfigProviderProps {
   cascader?: ComponentStyleConfig;
   collapse?: ComponentStyleConfig;
   divider?: ComponentStyleConfig;
-  drawer?: ComponentStyleConfig;
+  drawer?: DrawerConfig;
   typography?: ComponentStyleConfig;
   skeleton?: ComponentStyleConfig;
   spin?: ComponentStyleConfig;
@@ -160,7 +171,7 @@ export interface ConfigProviderProps {
   layout?: ComponentStyleConfig;
   list?: ComponentStyleConfig;
   mentions?: ComponentStyleConfig;
-  modal?: ComponentStyleConfig;
+  modal?: ModalConfig;
   progress?: ComponentStyleConfig;
   result?: ComponentStyleConfig;
   slider?: ComponentStyleConfig;
@@ -187,7 +198,7 @@ export interface ConfigProviderProps {
   tree?: ComponentStyleConfig;
   colorPicker?: ComponentStyleConfig;
   datePicker?: ComponentStyleConfig;
-
+  flex?: FlexConfig;
   /**
    * Wave is special component which only patch on the effect of component interaction.
    */
@@ -328,17 +339,10 @@ const ProviderChildren: React.FC<ProviderChildrenProps> = (props) => {
     tree,
     colorPicker,
     datePicker,
+    flex,
     wave,
+    warning: warningConfig,
   } = props;
-
-  // =================================== Warning ===================================
-  if (process.env.NODE_ENV !== 'production') {
-    warning(
-      dropdownMatchSelectWidth === undefined,
-      'ConfigProvider',
-      '`dropdownMatchSelectWidth` is deprecated. Please use `popupMatchSelectWidth` instead.',
-    );
-  }
 
   // =================================== Context ===================================
   const getPrefixCls = React.useCallback(
@@ -357,10 +361,9 @@ const ProviderChildren: React.FC<ProviderChildrenProps> = (props) => {
   );
 
   const iconPrefixCls = customIconPrefixCls || parentContext.iconPrefixCls || defaultIconPrefixCls;
-  const shouldWrapSSR = iconPrefixCls !== parentContext.iconPrefixCls;
   const csp = customCsp || parentContext.csp;
 
-  const wrapSSR = useStyle(iconPrefixCls, csp);
+  useStyle(iconPrefixCls, csp);
 
   const mergedTheme = useTheme(theme, parentContext.theme);
 
@@ -427,7 +430,9 @@ const ProviderChildren: React.FC<ProviderChildrenProps> = (props) => {
     tree,
     colorPicker,
     datePicker,
+    flex,
     wave,
+    warning: warningConfig,
   };
 
   const config = {
@@ -468,7 +473,12 @@ const ProviderChildren: React.FC<ProviderChildrenProps> = (props) => {
     [iconPrefixCls, csp],
   );
 
-  let childNode = shouldWrapSSR ? wrapSSR(children as ReactElement) : children;
+  let childNode = (
+    <>
+      <PropWarning dropdownMatchSelectWidth={dropdownMatchSelectWidth} />
+      {children}
+    </>
+  );
 
   const validateMessages = React.useMemo(
     () =>
@@ -484,7 +494,7 @@ const ProviderChildren: React.FC<ProviderChildrenProps> = (props) => {
   if (Object.keys(validateMessages).length > 0) {
     childNode = (
       <ValidateMessagesContext.Provider value={validateMessages}>
-        {children}
+        {childNode}
       </ValidateMessagesContext.Provider>
     );
   }
@@ -537,22 +547,34 @@ const ProviderChildren: React.FC<ProviderChildrenProps> = (props) => {
       parsedComponents[componentName] = parsedToken;
     });
 
+    const mergedToken = {
+      ...defaultSeedToken,
+      ...token,
+    };
+
     return {
       ...rest,
       theme: themeObj,
 
-      token: {
-        ...defaultSeedToken,
-        ...token,
-      },
-
+      token: mergedToken,
       components: parsedComponents,
+      override: {
+        override: mergedToken,
+        ...parsedComponents,
+      },
     };
   }, [mergedTheme]);
 
   if (theme) {
     childNode = (
       <DesignTokenContext.Provider value={memoTheme}>{childNode}</DesignTokenContext.Provider>
+    );
+  }
+
+  // ================================== Warning ===================================
+  if (memoedConfig.warning) {
+    childNode = (
+      <WarningContext.Provider value={memoedConfig.warning}>{childNode}</WarningContext.Provider>
     );
   }
 
