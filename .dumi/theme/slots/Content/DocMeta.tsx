@@ -1,10 +1,15 @@
-import React, { useState, useLayoutEffect, useMemo } from 'react';
-import { Typography, Space, Skeleton, Avatar } from 'antd';
-import { useRouteMeta } from 'dumi';
-import DayJS from 'dayjs';
+import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { CalendarOutlined } from '@ant-design/icons';
+import { Avatar, Flex, Skeleton, Typography } from 'antd';
+import DayJS from 'dayjs';
+import { useRouteMeta } from 'dumi';
 
-const AuthorAvatar: React.FC<{ name: string; avatar: string }> = ({ name, avatar }) => {
+interface AuthorAvatarPoprs {
+  name: string;
+  avatar: string;
+}
+
+const AuthorAvatar: React.FC<AuthorAvatarPoprs> = ({ name, avatar }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   useLayoutEffect(() => {
@@ -26,7 +31,7 @@ const AuthorAvatar: React.FC<{ name: string; avatar: string }> = ({ name, avatar
   );
 };
 
-const DocMeta: React.FC<{}> = () => {
+const DocMeta: React.FC = () => {
   const meta = useRouteMeta();
 
   const mergedAuthorInfos = useMemo(() => {
@@ -52,26 +57,26 @@ const DocMeta: React.FC<{}> = () => {
 
   return (
     <Typography.Paragraph>
-      <Space>
+      <Flex gap="small">
         {meta.frontmatter.date && (
           <span style={{ opacity: 0.65 }}>
             <CalendarOutlined /> {DayJS(meta.frontmatter.date).format('YYYY-MM-DD')}
           </span>
         )}
-        {mergedAuthorInfos.map((info) => (
+        {mergedAuthorInfos.map<React.ReactNode>((info) => (
           <a
             href={`https://github.com/${info.name}`}
             target="_blank"
             rel="noopener noreferrer"
             key={info.name}
           >
-            <Space size={3}>
+            <Flex gap={4}>
               <AuthorAvatar name={info.name} avatar={info.avatar} />
               <span style={{ opacity: 0.65 }}>@{info.name}</span>
-            </Space>
+            </Flex>
           </a>
         ))}
-      </Space>
+      </Flex>
     </Typography.Paragraph>
   );
 };

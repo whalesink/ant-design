@@ -127,7 +127,7 @@ describe('Form', () => {
 
           try {
             await form.validateFields();
-          } catch (err) {
+          } catch {
             // do nothing
           }
         };
@@ -179,7 +179,7 @@ describe('Form', () => {
 
     // https://github.com/ant-design/ant-design/issues/41620
     it('should not throw error when `help=false` and `noStyle=true`', async () => {
-      const App = (props: { help?: boolean | React.ReactNode }) => {
+      const App: React.FC<{ help?: React.ReactNode }> = (props) => {
         const { help = false } = props || {};
         return (
           <Form>
@@ -1777,7 +1777,9 @@ describe('Form', () => {
       const form = useRef<FormInstance<any>>(null);
 
       useEffect(() => {
-        if (!trigger) return;
+        if (!trigger) {
+          return;
+        }
         form.current?.validateFields();
       }, [trigger]);
 
@@ -1885,7 +1887,9 @@ describe('Form', () => {
       const form = useRef<FormInstance<any>>(null);
 
       useEffect(() => {
-        if (!trigger) return;
+        if (!trigger) {
+          return;
+        }
         form.current?.validateFields();
       }, [trigger]);
 
